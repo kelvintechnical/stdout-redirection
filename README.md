@@ -34,6 +34,69 @@ Redirect: command → stdout → file
 
 ---
 
+## 🗺️ Path Reference: `./` vs `~/` vs `cd`
+
+Think of it like a **physical location**:
+
+| You are at | Analogy |
+|---|---|
+| Your terminal prompt | You standing somewhere in a building |
+| `cd` | Walking to a different room |
+| `~/` | Your apartment number — a fixed address |
+| `./` | "Right here where I'm standing" |
+
+---
+
+### `./` — Right here
+
+```bash
+# You're in /home/ec2-user/redirection-lab
+./script.sh        # Run script.sh IN THIS FOLDER
+```
+
+Without `./`, Linux won't look in the current folder for programs — it only searches folders in your `$PATH`. `./` forces it to look right where you are.
+
+---
+
+### `~/` — Your home address
+
+```bash
+~/redirection-lab       # = /home/ec2-user/redirection-lab
+~/documents/file.txt    # = /home/ec2-user/documents/file.txt
+```
+
+`~/` is just a **shortcut** — it always expands to your home directory regardless of where you currently are. You're not moving anywhere — you're just referencing a full path.
+
+---
+
+### `cd` — Actually move
+
+```bash
+cd ~/redirection-lab    # Now you ARE in /home/ec2-user/redirection-lab
+cd /var/tmp             # Now you ARE in /var/tmp
+cd ~                    # Go back home
+cd ..                   # Go up one directory
+```
+
+---
+
+### The key difference
+
+```bash
+# These do the SAME thing two different ways:
+
+# Option 1 — reference with ~/
+rm -rf ~/redirection-lab    # Delete it from wherever you are
+
+# Option 2 — move first, then act
+cd ~
+rm -rf redirection-lab      # Now you're home, so no ~/ needed
+```
+
+> **Rule of thumb:** Use `~/` when you want to reference a path without moving. Use `cd` when you need to work inside a directory for multiple commands.
+
+---
+
 ## 📚 Operator Reference
 
 | Operator | Behavior | File exists? | File missing? |
@@ -69,11 +132,6 @@ cd ~/redirection-lab
 
 ```bash
 echo "First line" > output.txt
-```
-
-**Verify it worked:**
-
-```bash
 cat output.txt
 ```
 
@@ -82,8 +140,6 @@ cat output.txt
 ```
 First line
 ```
-
-#### What happened
 
 | Part | Meaning |
 |---|---|
@@ -97,8 +153,6 @@ First line
 
 ### Step 3 — Overwrite behavior of `>`
 
-Run the same redirect again with different text:
-
 ```bash
 echo "Replacement line" > output.txt
 cat output.txt
@@ -109,8 +163,6 @@ cat output.txt
 ```
 Replacement line
 ```
-
-#### What happened
 
 "First line" is **gone**. `>` truncated the file to zero bytes before writing. It did not ask for confirmation. This is permanent — there is no recycle bin in Linux.
 
@@ -135,8 +187,6 @@ Line 2
 Line 3
 ```
 
-#### What happened
-
 | Command | File state after |
 |---|---|
 | `echo "Line 1" > output.txt` | File contains: `Line 1` |
@@ -148,8 +198,6 @@ Line 3
 ---
 
 ### Step 5 — Redirect real command output
-
-This is the practical form you'll use on the exam. Redirect `ls` output to a file:
 
 ```bash
 ls /etc > etc-listing.txt
@@ -175,36 +223,20 @@ ls /var >> etc-listing.txt
 wc -l etc-listing.txt
 ```
 
-**Expected output:**
-
-```
-237 etc-listing.txt
-```
-
-> `wc -l` counts lines in a file. The exact number will vary — this confirms both directory listings were captured in a single file without either overwriting the other.
+> `wc -l` counts lines in a file. Confirms both directory listings were captured without either overwriting the other.
 
 ---
 
 ### Step 6 — Understand stderr (`2>`)
-
-Not all output is stdout. Error messages go to **stderr** — a separate stream. Redirection with `>` does not capture them.
 
 ```bash
 ls /nonexistent > errors.txt
 cat errors.txt
 ```
 
-**Expected output:**
+The error appeared on screen even though you redirected to a file — and `errors.txt` is empty. Why?
 
-```
-ls: cannot access '/nonexistent': No such file or directory
-```
-
-Wait — the error appeared on screen even though you redirected to a file. And `errors.txt` is empty (or doesn't exist).
-
-#### Why?
-
-`>` only redirects **stdout (stream 1)**. The error message came from **stderr (stream 2)**. They are completely separate streams. Redirecting one does not affect the other.
+`>` only redirects **stdout (stream 1)**. Error messages go to **stderr (stream 2)** — a completely separate stream.
 
 **To capture stderr:**
 
@@ -219,20 +251,14 @@ cat errors.txt
 ls: cannot access '/nonexistent': No such file or directory
 ```
 
-Now the error is in the file and nothing appears on screen.
-
 ---
 
 ### Step 7 — Capture both stdout and stderr together
-
-Real commands produce a mix of normal output and errors. The RHCSA Task 14 (`find` across the whole filesystem) will generate permission errors alongside results. You need both in the file.
 
 ```bash
 find /etc -name "*.conf" > find-results.txt 2>&1
 wc -l find-results.txt
 ```
-
-#### Command breakdown
 
 | Part | Meaning |
 |---|---|
@@ -241,43 +267,24 @@ wc -l find-results.txt
 
 **Read `2>&1` as:** "Send stream 2 to wherever stream 1 is currently going."
 
-> **Order matters:** `2>&1 > file` is wrong — it redirects stderr to the screen (where stdout was before the `>`), then redirects stdout to the file. Always write `> file 2>&1`.
+> ⚠️ **Order matters:** `2>&1 > file` is wrong. Always write `> file 2>&1`.
 
-**Alternative — shorthand for both streams:**
+**Shorthand alternative:**
 
 ```bash
 find /etc -name "*.conf" &> find-results.txt
 ```
 
-`&>` is bash shorthand that redirects both stdout and stderr to the file in one operator.
-
 ---
 
 ### Step 8 — `tee`: write to file AND see output on screen
 
-`>` silences your terminal — you write to a file but see nothing. `tee` does both simultaneously.
-
 ```bash
 ls /etc | tee screen-and-file.txt | head -5
-```
-
-**Expected output (on screen):**
-
-```
-DIR_COLORS
-DIR_COLORS.256color
-DIR_COLORS.lightbgcolor
-GREP_COLORS
-NetworkManager
-```
-
-**Verify the file also has content:**
-
-```bash
 wc -l screen-and-file.txt
 ```
 
-Both the screen and the file received the full output. `head -5` only limited what you saw on screen — the file is complete.
+`tee` sends output to both the screen and the file simultaneously. `head -5` only limits what you see on screen — the file receives everything.
 
 **Append with `tee -a`:**
 
@@ -285,16 +292,16 @@ Both the screen and the file received the full output. `head -5` only limited wh
 echo "appended line" | tee -a screen-and-file.txt
 ```
 
-> `tee` is especially useful when running long commands — you watch progress on screen while the file captures everything.
-
 ---
 
 ### Step 9 — RHCSA exam pattern: find + redirect
 
-Task 14 from the sample exam: *"Search for all files modified in the past 30 days and save the listing to `/var/tmp/modfiles.txt`."*
+Task 14: *"Search for all files modified in the past 30 days and save the listing to `/var/tmp/modfiles.txt`."*
 
 ```bash
 find / -mtime -30 > /var/tmp/modfiles.txt 2>&1
+wc -l /var/tmp/modfiles.txt
+head -10 /var/tmp/modfiles.txt
 ```
 
 | Part | Meaning |
@@ -302,36 +309,59 @@ find / -mtime -30 > /var/tmp/modfiles.txt 2>&1
 | `find /` | Search from filesystem root |
 | `-mtime -30` | Modified within the last 30 days (`-` means "less than") |
 | `> /var/tmp/modfiles.txt` | Write results to this file |
-| `2>&1` | Include permission errors (from `/proc`, `/sys`, etc.) in the file instead of cluttering the screen |
-
-**Verify:**
-
-```bash
-wc -l /var/tmp/modfiles.txt
-head -10 /var/tmp/modfiles.txt
-```
-
-> Without `2>&1`, your terminal floods with `Permission denied` errors while the file captures only the accessible paths. Including stderr in the file keeps your terminal clean and produces a complete record.
+| `2>&1` | Include permission errors in the file instead of cluttering the screen |
 
 ---
 
 ### Step 10 — RHCSA exam pattern: grep + redirect
 
-Task 19 from the sample exam: *"Lock user70. Use regex to capture the lock line and store it in `/var/tmp/user70.lock`."*
+Task 19: *"Lock user70. Use regex to capture the lock line and store it in `/var/tmp/user70.lock`."*
+
+> ⚠️ Create the user first if they don't exist:
+> ```bash
+> sudo useradd user70
+> ```
 
 ```bash
 sudo usermod -L user70
-sudo grep "user70" /etc/shadow | grep "^user70:!" > /var/tmp/user70.lock
+sudo grep "^user70:!" /etc/shadow > /var/tmp/user70.lock
 cat /var/tmp/user70.lock
 ```
 
 **Expected output:**
 
 ```
-user70:!$6$xyz...:19000:0:99999:7:::
+user70:!:20594:0:99999:7:::
 ```
 
-The `!` at the start of the password hash field indicates a locked account. The `>` captures that specific line into the file the exam requires.
+**Command breakdown:**
+
+| Part | Meaning |
+|---|---|
+| `sudo` | Run as root — `/etc/shadow` is only readable by root |
+| `grep` | Search for a pattern in a file |
+| `^` | Regex — line must **start with** this pattern |
+| `user70:!` | Match lines starting with `user70:!` — `!` means account is locked |
+| `/etc/shadow` | File storing hashed passwords for all users |
+| `>` | Redirect stdout to a file (overwrite) |
+| `/var/tmp/user70.lock` | Destination file — created if it doesn't exist |
+
+**`/etc/shadow` field breakdown:**
+
+```
+user70 : !      : 20594       : 0        : 99999    : 7        : : : :
+user     locked   last change   min age    max age    warning
+```
+
+| Field | Value | Meaning |
+|---|---|---|
+| `user70` | username | The account |
+| `!` | locked | `!` prefix = account is locked, can't login |
+| `20594` | last change | Days since Jan 1 1970 password was last changed |
+| `0` | min age | Minimum days before password can be changed |
+| `99999` | max age | Days until password expires (99999 = never) |
+| `7` | warning | Days before expiry to warn user |
+| `:::` | empty fields | Inactive period, expiry date, reserved — all unset |
 
 ---
 
@@ -342,6 +372,20 @@ cd ~
 rm -rf ~/redirection-lab
 rm -f /var/tmp/modfiles.txt /var/tmp/user70.lock
 ```
+
+**Command breakdown:**
+
+| Command | Meaning |
+|---|---|
+| `cd ~` | Return to home directory before deleting |
+| `rm` | Remove |
+| `-r` | Recursive — delete directory and everything inside it |
+| `-f` | Force — no confirmation prompts, ignore missing files |
+| `~/redirection-lab` | Works from **anywhere** — `~/` is an absolute reference to home |
+| `rm -f` with two paths | Deletes both files in one command, no prompts |
+| `/var/tmp/` | Temporary files directory — survives reboots unlike `/tmp` |
+
+> `~/redirection-lab` works from anywhere because `~/` is an absolute reference to your home directory — no need to `cd` first.
 
 ---
 
@@ -384,6 +428,7 @@ Do you want to see output AND save it?
 | Missing `2>&1` on `find /` | Terminal floods with `Permission denied` | Add `2>&1` to send errors to the file |
 | Forgetting `sudo` when redirecting to `/var/tmp` | `Permission denied` on the file write | Use `sudo tee` instead: `command | sudo tee /var/tmp/file` |
 | `cat` on a huge file | Terminal scrolls uncontrollably | Use `head -20` or `less` instead |
+| User doesn't exist before `usermod -L` | `usermod: user 'user70' does not exist` | Run `sudo useradd user70` first |
 
 ---
 
